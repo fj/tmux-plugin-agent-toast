@@ -1,6 +1,6 @@
 # tmux-plugin-agent-toast
 
-A tmux plugin that shows a toast when a coding agent stops working.
+A tmux plugin that shows a toast when a coding agent finishes work.
 
 When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds.
 
