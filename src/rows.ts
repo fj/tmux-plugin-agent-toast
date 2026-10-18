@@ -1,0 +1,31 @@
+import { markOf, type Row } from './frame.ts'
+import type { Description } from './harnesses/index.ts'
+import type { AgentWindow } from './windows.ts'
+
+export type Described = { window: AgentWindow; description: Description }
+export type Describe = (window: AgentWindow) => Promise<Description>
+
+export function cachedDescribe(describe: Describe): Describe {
+  const descriptions = new Map<string, Promise<Description>>()
+
+  return window => {
+    const key = `${window.id}\n${window.harness}\n${window.session}`
+    if (!descriptions.has(key)) descriptions.set(key, describe(window))
+    return descriptions.get(key)!
+  }
+}
+
+export function describeAll(windows: readonly AgentWindow[], newIds: ReadonlySet<string>, describe: Describe): Promise<Described[]> {
+  const newFirst = windows.toSorted((a, b) => Number(newIds.has(b.id)) - Number(newIds.has(a.id)))
+
+  return Promise.all(newFirst.map(async window => ({ window, description: await describe(window) })))
+}
+
+export function rowsAt(described: readonly Described[], newIds: ReadonlySet<string>, nowMs: number): Row[] {
+  return described.map(({ window, description }) => ({
+    mark: markOf(window.state, nowMs),
+    target: `${window.target} ${window.id}`,
+    ...description,
+    isNew: newIds.has(window.id),
+  }))
+}
