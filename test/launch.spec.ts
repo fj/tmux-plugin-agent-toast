@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { after, test } from 'node:test'
 
 import { launchPopups, lockPath, parseClients, popupArgv, POPUP } from '../src/launch.ts'
+import { FIELD_SEPARATOR } from '../src/windows.ts'
 
 const CONF = join(import.meta.dirname, '..', 'agent-toast.conf')
 const SOCKET = `tmux-toast-test-${process.pid}`
@@ -21,7 +22,7 @@ const hasTmux = (() => {
 })()
 
 test('clients are parsed with their size', () => {
-  assert.deepEqual(parseClients('/dev/pts/2\x1f208\x1f57\n'), [{ name: '/dev/pts/2', width: 208, height: 57 }])
+  assert.deepEqual(parseClients(['/dev/pts/2', '208', '57\n'].join(FIELD_SEPARATOR)), [{ name: '/dev/pts/2', width: 208, height: 57 }])
 })
 
 test('each client gets its own lock file', () => {
@@ -46,7 +47,7 @@ test('a small client limits the popup size', () => {
 
 test('every attached client gets a popup under its own lock', async () => {
   const started: (readonly string[])[] = []
-  const clients = ['/dev/pts/2\x1f100\x1f40', '/dev/pts/3\x1f80\x1f30'].join('\n')
+  const clients = [['/dev/pts/2', '100', '40'], ['/dev/pts/3', '80', '30']].map(fields => fields.join(FIELD_SEPARATOR)).join('\n')
 
   await launchPopups(async () => clients, 2, ['@1'], argv => void started.push(argv))
 

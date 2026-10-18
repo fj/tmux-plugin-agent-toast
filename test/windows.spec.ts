@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { justSettled, markSeenArgs } from '../src/transitions.ts'
-import { parseWindows, type AgentWindow } from '../src/windows.ts'
+import { FIELD_SEPARATOR, parseWindows, type AgentWindow } from '../src/windows.ts'
 
-const line = (...fields: string[]) => fields.join('\x1f')
+const line = (...fields: string[]) => fields.join(FIELD_SEPARATOR)
 const agent = (id: string, state: string, seen: string): AgentWindow => ({ id, target: 's:1', name: 'w', state, harness: 'pi', session: '', seen })
 
 test('only windows with agent options are listed, once each', () => {

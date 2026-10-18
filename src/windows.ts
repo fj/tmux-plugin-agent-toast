@@ -14,7 +14,7 @@ export type AgentWindow = {
 
 export type Tmux = (args: readonly string[]) => Promise<string>
 
-const FIELD_SEPARATOR = '\x1f'
+export const FIELD_SEPARATOR = '|:|'
 const FIELDS: Record<keyof AgentWindow, string> = {
   id: '#{window_id}',
   target: '#{session_name}:#{window_index}',

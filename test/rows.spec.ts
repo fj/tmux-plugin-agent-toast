@@ -3,12 +3,12 @@ import { test } from 'node:test'
 
 import { notifySettled } from '../src/notify.ts'
 import { cachedDescribe, describeAll, rowsAt } from '../src/rows.ts'
-import type { AgentWindow } from '../src/windows.ts'
+import { FIELD_SEPARATOR, type AgentWindow } from '../src/windows.ts'
 
 const window = (id: string, state = 'done', seen = state, session = 's'): AgentWindow => ({ id, target: `s:${id.slice(1)}`, name: `w${id}`, state, harness: 'pi', session, seen })
 const byName = async ({ name }: AgentWindow) => ({ label: 'Pi', summary: name })
 const listing = (windows: readonly AgentWindow[]) =>
-  windows.map(w => [w.id, w.target, w.name, w.state, w.harness, w.session, w.seen].join('\x1f')).join('\n')
+  windows.map(w => [w.id, w.target, w.name, w.state, w.harness, w.session, w.seen].join(FIELD_SEPARATOR)).join('\n')
 
 test('newly settled windows come first, and the rest keep their order', async () => {
   const described = await describeAll([window('@1'), window('@2'), window('@3')], new Set(['@3']), byName)

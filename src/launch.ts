@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { CHROME_LINES } from './frame.ts'
-import type { Tmux } from './windows.ts'
+import { FIELD_SEPARATOR, type Tmux } from './windows.ts'
 
 export type Client = { name: string; width: number; height: number }
 
@@ -12,7 +12,6 @@ export const POPUP = join(import.meta.dirname, 'popup.ts')
 const PREFERRED_WIDTH = 72
 const MAX_ROWS = 10
 const STATUS_LINE_ROWS = 1
-const FIELD_SEPARATOR = '\x1f'
 const CLIENT_FORMAT = ['#{client_name}', '#{client_width}', '#{client_height}'].join(FIELD_SEPARATOR)
 
 export function parseClients(text: string): Client[] {
