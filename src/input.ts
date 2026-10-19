@@ -17,3 +17,15 @@ export function typedAfter(typed: string, keys: string): string {
 export function isAcknowledged(typed: string): boolean {
   return typed.toLowerCase() === ACKNOWLEDGEMENT
 }
+
+function isOnTrack(typed: string): boolean {
+  const lower = typed.toLowerCase()
+
+  return [...lower].some((_, i) => ACKNOWLEDGEMENT.startsWith(lower.slice(i)))
+}
+
+export function isMistyped(keys: string, typed: string): boolean {
+  const pressed = [...keys].filter(key => !ERASE_KEYS.has(key))
+
+  return pressed.length > 0 && (!pressed.every(key => PRINTABLE.test(key)) || !isOnTrack(typed))
+}
