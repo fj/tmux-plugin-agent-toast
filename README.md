@@ -2,7 +2,7 @@
 
 A tmux plugin that shows a toast when a coding agent finishes work.
 
-When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds.
+When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds. If you press a key that is not part of `ok`, a red wave pulses across the popup from the cursor.
 
 ## Install
 
@@ -22,14 +22,16 @@ You need tmux 3.3 or newer, Node 22.18 or newer, and `flock` on `PATH`.
 
 ## Options
 
-Set this global option in your tmux config:
+Set these global options in your tmux config:
 
 | Option | Default | Value |
 |---|---|---|
 | `@agent_toast_timeout` | `10` | Seconds before the popup closes. |
+| `@agent_toast_wave` | `on` | `off` stops the wave when you press a wrong key. |
 
 ```tmux
 set -g @agent_toast_timeout 20
+set -g @agent_toast_wave off
 ```
 
 ## Feed it

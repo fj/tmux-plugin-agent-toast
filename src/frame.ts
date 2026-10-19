@@ -1,5 +1,6 @@
 import { fit, textWidth } from './cells.ts'
 import { rainbow, type Rgb } from './rainbow.ts'
+import { PULSE_MS, shade, waveAt } from './wave.ts'
 
 export type Mark = { glyph: string; rgb: Rgb | undefined }
 
@@ -14,6 +15,7 @@ export type FrameInput = {
   remainingMs: number
   totalMs: number
   typed: string
+  pulseAgeMs: number | undefined
 }
 
 const BUSY_FRAMES = ['◐', '◓', '◑', '◒']
@@ -99,15 +101,27 @@ export function meterBar(fraction: number, cells: number): string {
   return `▕${'█'.repeat(full)}${partial}${' '.repeat(cells - full - (partial === '' ? 0 : 1))}▏`
 }
 
-function footer(input: FrameInput, width: number): string {
+function footerParts(input: FrameInput, width: number): { meter: string; prompt: string | undefined; fallback: string } {
   const seconds = `${Math.ceil(input.remainingMs / MS_PER_SECOND)}s`
   const meter = `${meterBar(input.remainingMs / input.totalMs, METER_CELLS)} ${seconds}`
   const prompts = PROMPTS.map(prompt => `${prompt}${input.typed}${CURSOR}`)
   const prompt = prompts.find(text => width - textWidth(meter) - textWidth(text) >= 1)
 
+  return { meter, prompt, fallback: prompts.at(-1) ?? '' }
+}
+
+function footer(input: FrameInput, width: number): string {
+  const { meter, prompt, fallback } = footerParts(input, width)
+
   return prompt === undefined
-    ? fit(prompts.at(-1) ?? '', width)
+    ? fit(fallback, width)
     : `${paint(meter, METER_RGB)}${' '.repeat(width - textWidth(meter) - textWidth(prompt))}${prompt}`
+}
+
+function footerCursorX(input: FrameInput, width: number): number {
+  const { prompt, fallback } = footerParts(input, width)
+
+  return prompt === undefined ? Math.min(textWidth(fallback), width) - 1 : width - 1
 }
 
 function bodyLines(input: FrameInput, width: number): string[] {
@@ -127,6 +141,10 @@ export function renderFrame(input: FrameInput): string[] {
   const inner = input.width - BORDER_CELLS - 2 * PADDING
   const pad = ' '.repeat(PADDING)
   const body = bodyLines(input, inner).map((line, i) => `${side(0, i + 1, input)}${pad}${line}${pad}${side(input.width - 1, i + 1, input)}`)
+  const lines = [borderLine(0, input), ...body, borderLine(input.height - 1, input)]
+  const { pulseAgeMs } = input
 
-  return [borderLine(0, input), ...body, borderLine(input.height - 1, input)]
+  if (pulseAgeMs === undefined || pulseAgeMs >= PULSE_MS) return lines
+  const pulse = { x: 1 + PADDING + footerCursorX(input, inner), y: input.height - 2, ageMs: pulseAgeMs }
+  return lines.map((line, y) => shade(line, x => waveAt(pulse, x, y)))
 }

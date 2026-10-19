@@ -3,11 +3,22 @@ import { test } from 'node:test'
 
 import { fit, textWidth } from '../src/cells.ts'
 import { markOf, meterBar, perimeterIndex, renderFrame, type FrameInput } from '../src/frame.ts'
-import { isAcknowledged, typedAfter } from '../src/input.ts'
+import { isAcknowledged, isMistyped, typedAfter } from '../src/input.ts'
 import { rainbow } from '../src/rainbow.ts'
+import { PULSE_MS, shade, waveAt } from '../src/wave.ts'
 
 const ANSI = /\x1b\[[0-9;]*m/g
 const plain = (line: string) => line.replace(ANSI, '')
+const backgrounds = (line: string) => {
+  const cells: (string | undefined)[] = []
+  let current: string | undefined
+  for (const [, code, char] of line.matchAll(/\x1b\[([0-9;]*)m|(.)/gsu)) {
+    if (code?.startsWith('48;2;')) current = code.slice('48;2;'.length)
+    else if (code === '49' || code === '0') current = undefined
+    else if (char !== undefined) cells.push(...Array.from({ length: textWidth(char) }, () => current))
+  }
+  return cells
+}
 const row = (summary: string, isNew = false) => ({ mark: markOf('done', 0), target: 's:1 @1', label: 'Pi', summary, isNew })
 const frame = (overrides: Partial<FrameInput> = {}): FrameInput => ({
   width: 40,
@@ -18,6 +29,7 @@ const frame = (overrides: Partial<FrameInput> = {}): FrameInput => ({
   remainingMs: 5000,
   totalMs: 10_000,
   typed: '',
+  pulseAgeMs: undefined,
   ...overrides,
 })
 
@@ -115,4 +127,50 @@ test('only typing ok acknowledges, in any case', () => {
   assert.equal(isAcknowledged(typedAfter('', 'o\rk')), true)
   assert.equal(isAcknowledged(typedAfter('', 'ox\x7fk')), true)
   assert.equal(isAcknowledged(typedAfter('', '\x03\x1b\r')), false)
+})
+
+test('only a key that strays from ok is a mistype', () => {
+  const press = (typed: string, keys: string) => isMistyped(keys, typedAfter(typed, keys))
+
+  assert.equal(press('', 'o'), false)
+  assert.equal(press('', 'O'), false)
+  assert.equal(press('o', 'o'), false)
+  assert.equal(press('x', '\x7f'), false)
+  assert.equal(press('', 'x'), true)
+  assert.equal(press('', 'k'), true)
+  assert.equal(press('o', 'x'), true)
+  assert.equal(press('o', '\r'), true)
+  assert.equal(press('', '\x1b[A'), true)
+})
+
+test('the wave rings out from its origin and fades', () => {
+  const pulse = { x: 60, y: 5, ageMs: 0 }
+  const nearestLit = (ageMs: number) =>
+    Array.from({ length: pulse.x }, (_, d) => d).find(d => waveAt({ ...pulse, ageMs }, pulse.x - d, pulse.y) !== undefined)
+
+  assert.equal(nearestLit(0), 0)
+  assert.ok((nearestLit(PULSE_MS / 4) ?? 0) > 0)
+  assert.ok((nearestLit(PULSE_MS / 2) ?? 0) > (nearestLit(PULSE_MS / 4) ?? 0))
+  assert.equal(nearestLit(PULSE_MS), undefined)
+})
+
+test('shading keeps the text and colors each cell, wide or narrow', () => {
+  const line = `a\x1b[1m日\x1b[0mb`
+  const shaded = shade(line, x => (x === 1 ? [1, 2, 3] : undefined))
+
+  assert.equal(plain(shaded), 'a日b')
+  assert.deepEqual(backgrounds(shaded), [undefined, '1;2;3', '1;2;3', undefined])
+})
+
+test('a mistype pulses the popup from the prompt cursor', () => {
+  const quiet = renderFrame(frame())
+  const pulsed = renderFrame(frame({ pulseAgeMs: 0 }))
+  const footer = backgrounds(pulsed[5] ?? '')
+  const cursorX = plain(pulsed[5] ?? '').lastIndexOf('▏')
+
+  assert.deepEqual(pulsed.map(plain), quiet.map(plain))
+  assert.ok(quiet.every(line => !line.includes('48;2;')))
+  assert.notEqual(footer[cursorX], undefined)
+  assert.equal(backgrounds(pulsed[0] ?? '')[0], undefined)
+  assert.ok(renderFrame(frame({ pulseAgeMs: PULSE_MS })).every(line => !line.includes('48;2;')))
 })
