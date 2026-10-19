@@ -3,9 +3,9 @@ import { renderFrame } from './frame.ts'
 import { describe } from './harnesses/index.ts'
 import { isAcknowledged, typedAfter } from './input.ts'
 import { cachedDescribe, describeAll, rowsAt, type Described } from './rows.ts'
+import { readSettings } from './settings.ts'
 import { listWindows, tmux } from './windows.ts'
 
-const TOTAL_MS = 10_000
 const FRAME_MS = 100
 const REFRESH_MS = 1000
 const TITLE = 'agents'
@@ -16,6 +16,7 @@ const HOME = '\x1b[H'
 const newIds = new Set(process.argv.slice(2))
 const describeWindow = cachedDescribe(describe)
 const startMs = Date.now()
+const settings = await readSettings(tmux)
 let described: Described[] = []
 let typed = ''
 
@@ -32,8 +33,8 @@ function draw(): void {
     nowMs,
     title: TITLE,
     rows: rowsAt(described, newIds, nowMs),
-    remainingMs: Math.max(0, TOTAL_MS - (nowMs - startMs)),
-    totalMs: TOTAL_MS,
+    remainingMs: Math.max(0, settings.totalMs - (nowMs - startMs)),
+    totalMs: settings.totalMs,
     typed,
   })
 
@@ -56,5 +57,5 @@ process.stdin.on('data', (keys: string) => {
 await refresh()
 setInterval(refresh, REFRESH_MS)
 setInterval(draw, FRAME_MS)
-setTimeout(close, TOTAL_MS)
+setTimeout(close, settings.totalMs)
 draw()

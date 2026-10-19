@@ -20,6 +20,18 @@ source-file /path/to/tmux-plugin-agent-toast/agent-toast.conf
 
 You need tmux 3.3 or newer, Node 22.18 or newer, and `flock` on `PATH`.
 
+## Options
+
+Set this global option in your tmux config:
+
+| Option | Default | Value |
+|---|---|---|
+| `@agent_toast_timeout` | `10` | Seconds before the popup closes. |
+
+```tmux
+set -g @agent_toast_timeout 20
+```
+
 ## Feed it
 
 The plugin does not watch agents itself. Something must set these window options on the window of each agent:
