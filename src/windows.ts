@@ -10,6 +10,7 @@ export type AgentWindow = {
   harness: string
   session: string
   seen: string
+  title: string
 }
 
 export type Tmux = (args: readonly string[]) => Promise<string>
@@ -23,6 +24,7 @@ const FIELDS: Record<keyof AgentWindow, string> = {
   harness: '#{@agent_harness}',
   session: '#{@agent_session}',
   seen: `#{${SEEN_OPTION}}`,
+  title: '#{pane_title}',
 }
 const KEYS = Object.keys(FIELDS) as (keyof AgentWindow)[]
 

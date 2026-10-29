@@ -5,7 +5,7 @@ import { notifySettled } from '../src/notify.ts'
 import { cachedDescribe, describeAll, rowsAt } from '../src/rows.ts'
 import { FIELD_SEPARATOR, type AgentWindow } from '../src/windows.ts'
 
-const window = (id: string, state = 'done', seen = state, session = 's'): AgentWindow => ({ id, target: `s:${id.slice(1)}`, name: `w${id}`, state, harness: 'pi', session, seen })
+const window = (id: string, state = 'done', seen = state, session = 's'): AgentWindow => ({ id, target: `s:${id.slice(1)}`, name: `w${id}`, state, harness: 'pi', session, seen, title: '' })
 const byName = async ({ name }: AgentWindow) => ({ label: 'Pi', summary: name })
 const listing = (windows: readonly AgentWindow[]) =>
   windows.map(w => [w.id, w.target, w.name, w.state, w.harness, w.session, w.seen].join(FIELD_SEPARATOR)).join('\n')

@@ -54,7 +54,9 @@ A harness strategy in `src/harnesses/` reads the session that `@agent_session` n
 |---|---|---|
 | `claude` | The session id. | The custom title, the AI title, the summary, or the last prompt of the transcript. |
 | `pi` | The session file. | The session name, or the first prompt. |
-| Other | Not used. | The tmux window name. |
+| Other | Not used. | The pane title. |
+
+When a harness gives no summary, the toast uses the pane title without its leading status glyphs, then the window name.
 
 To add a harness, add a `Harness` to `HARNESSES` in `src/harnesses/index.ts`.
 
