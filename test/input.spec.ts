@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 
-import { keyReader, parseKeys, pressKeys, splitPending, type KeyState } from '../src/input.ts'
+import { keyReader, parseKeys, pressKeys, type KeyState } from '../src/input.ts'
 
 const ids = ['@1', '@2']
 const start: KeyState = { typed: '', selectedId: undefined }
@@ -46,19 +46,18 @@ test('a selection whose window closed is dropped', () => {
   assert.deepEqual(press('', { typed: '', selectedId: '@9' }), { state: start, action: undefined })
 })
 
-test('an escape sequence cut at the end waits for the rest', () => {
-  for (const pending of ['\x1b', '\x1b[', '\x1b[1;', '\x1bO']) {
-    assert.deepEqual(splitPending(`ok${pending}`), { complete: 'ok', pending }, JSON.stringify(pending))
+test('a cut-off escape sequence waits for the rest, and a whole one does not', () => {
+  const readAll = (...chunks: string[]) => {
+    const pressed: string[] = []
+    const read = keyReader(data => void pressed.push(data), 50)
+    for (const chunk of chunks) read(chunk)
+    return pressed
   }
-  assert.deepEqual(splitPending('\x1b[Ax'), { complete: '\x1b[Ax', pending: '' })
-  assert.deepEqual(splitPending('\x1b[1;5A'), { complete: '\x1b[1;5A', pending: '' })
-})
 
-test('the two halves of a split arrow join into one move', () => {
-  const { complete, pending } = splitPending('\x1b')
-
-  assert.deepEqual(parseKeys(complete), [])
-  assert.deepEqual(parseKeys(splitPending(`${pending}[B`).complete), [{ kind: 'move', step: 1 }])
+  for (const pending of ['\x1b', '\x1b[', '\x1b[1;', '\x1bO']) {
+    assert.deepEqual(readAll(`ok${pending}`, 'A'), ['ok', `${pending}A`], JSON.stringify(pending))
+  }
+  assert.deepEqual(readAll('\x1b[Ax', '\x1b[1;5A'), ['\x1b[Ax', '\x1b[1;5A'])
 })
 
 test('the key reader joins a split arrow and flushes a lone Esc after the wait', () => {

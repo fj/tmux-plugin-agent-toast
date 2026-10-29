@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { hold, remainingMs, startCountdown } from './countdown.ts'
 import { renderFrame } from './frame.ts'
 import { describe } from './harnesses/index.ts'
-import { keyReader, parseKeys, pressKeys, type KeyState } from './input.ts'
+import { keyReader, parseKeys } from './input.ts'
 import { parsePopupArgs } from './launch.ts'
 import { cachedDescribe, describeAll, rowsAt, type Described } from './rows.ts'
 import { readSettings } from './settings.ts'
+import { isExpired, pressToast, startToast, toastRemainingMs, type Timing } from './toast.ts'
 import { focusArgs, listWindows, tmux } from './windows.ts'
 
 const FRAME_MS = 40
@@ -20,12 +20,10 @@ const HOME = '\x1b[H'
 const { client, newIds: settledIds } = parsePopupArgs(process.argv.slice(2))
 const newIds = new Set(settledIds)
 const describeWindow = cachedDescribe(describe)
-let countdown = startCountdown(Date.now())
+let toast = startToast(Date.now())
 const settings = await readSettings(tmux)
+const timing: Timing = { totalMs: settings.totalMs, holdMs: ARROW_HOLD_MS, wave: settings.wave }
 let described: Described[] = []
-let keyState: KeyState = { typed: '', selectedId: undefined }
-let mistypedAtMs: number | undefined
-let focusing = false
 
 async function refresh(): Promise<void> {
   const windows = await listWindows(tmux).catch(() => described.map(({ window }) => window))
@@ -34,19 +32,18 @@ async function refresh(): Promise<void> {
 
 function draw(): void {
   const nowMs = Date.now()
-  const remaining = remainingMs(countdown, settings.totalMs, nowMs)
 
-  if (remaining === 0) close()
+  if (isExpired(toast, timing, nowMs)) close()
   const lines = renderFrame({
     width: process.stdout.columns,
     height: process.stdout.rows,
     nowMs,
     title: TITLE,
-    rows: rowsAt(described, newIds, keyState.selectedId, nowMs),
-    remainingMs: remaining,
+    rows: rowsAt(described, newIds, toast.keys.selectedId, nowMs),
+    remainingMs: toastRemainingMs(toast, timing, nowMs),
     totalMs: settings.totalMs,
-    typed: keyState.typed,
-    pulseAgeMs: mistypedAtMs === undefined ? undefined : nowMs - mistypedAtMs,
+    typed: toast.keys.typed,
+    pulseAgeMs: toast.mistypedAtMs === undefined ? undefined : nowMs - toast.mistypedAtMs,
   })
 
   process.stdout.write(HOME + lines.join('\r\n'))
@@ -58,20 +55,14 @@ function close(): never {
 }
 
 async function press(data: string): Promise<void> {
-  if (focusing) return
+  const pressed = pressToast(toast, parseKeys(data), described.map(({ window }) => window.id), timing, Date.now())
 
-  const keys = parseKeys(data)
-  const { state, action } = pressKeys(keyState, keys, described.map(({ window }) => window.id))
-
-  keyState = state
-  if (keys.some(key => key.kind === 'move')) countdown = hold(countdown, Date.now(), ARROW_HOLD_MS)
-  if (action === 'close') close()
-  if (action === 'focus' && state.selectedId !== undefined) {
-    focusing = true
-    await tmux(focusArgs(client, state.selectedId)).catch(() => undefined)
+  toast = pressed.toast
+  if (pressed.effect?.kind === 'close') close()
+  if (pressed.effect?.kind === 'focus') {
+    await tmux(focusArgs(client, pressed.effect.windowId)).catch(() => undefined)
     close()
   }
-  if (action === 'pulse' && settings.wave) mistypedAtMs = Date.now()
   draw()
 }
 

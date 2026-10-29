@@ -89,7 +89,7 @@ export function pressKeys(state: KeyState, keys: readonly Key[], ids: readonly s
   return { state: next, action: isMistyped(keys, typed) ? 'pulse' : undefined }
 }
 
-export function splitPending(data: string): { complete: string; pending: string } {
+function splitPending(data: string): { complete: string; pending: string } {
   const pending = INCOMPLETE_ESCAPE.exec(data)?.[0] ?? ''
 
   return { complete: data.slice(0, data.length - pending.length), pending }
