@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { hold, remainingMs, startCountdown } from './countdown.ts'
 import { renderFrame } from './frame.ts'
 import { describe } from './harnesses/index.ts'
 import { keyReader, parseKeys, pressKeys, type KeyState } from './input.ts'
@@ -10,6 +11,7 @@ import { focusArgs, listWindows, tmux } from './windows.ts'
 const FRAME_MS = 40
 const REFRESH_MS = 1000
 const ESCAPE_WAIT_MS = 50
+const ARROW_HOLD_MS = 3000
 const TITLE = 'agents'
 const HIDE_CURSOR = '\x1b[?25l'
 const SHOW_CURSOR = '\x1b[?25h'
@@ -18,7 +20,7 @@ const HOME = '\x1b[H'
 const { client, newIds: settledIds } = parsePopupArgs(process.argv.slice(2))
 const newIds = new Set(settledIds)
 const describeWindow = cachedDescribe(describe)
-const startMs = Date.now()
+let countdown = startCountdown(Date.now())
 const settings = await readSettings(tmux)
 let described: Described[] = []
 let keyState: KeyState = { typed: '', selectedId: undefined }
@@ -32,13 +34,16 @@ async function refresh(): Promise<void> {
 
 function draw(): void {
   const nowMs = Date.now()
+  const remaining = remainingMs(countdown, settings.totalMs, nowMs)
+
+  if (remaining === 0) close()
   const lines = renderFrame({
     width: process.stdout.columns,
     height: process.stdout.rows,
     nowMs,
     title: TITLE,
     rows: rowsAt(described, newIds, keyState.selectedId, nowMs),
-    remainingMs: Math.max(0, settings.totalMs - (nowMs - startMs)),
+    remainingMs: remaining,
     totalMs: settings.totalMs,
     typed: keyState.typed,
     pulseAgeMs: mistypedAtMs === undefined ? undefined : nowMs - mistypedAtMs,
@@ -55,9 +60,11 @@ function close(): never {
 async function press(data: string): Promise<void> {
   if (focusing) return
 
-  const { state, action } = pressKeys(keyState, parseKeys(data), described.map(({ window }) => window.id))
+  const keys = parseKeys(data)
+  const { state, action } = pressKeys(keyState, keys, described.map(({ window }) => window.id))
 
   keyState = state
+  if (keys.some(key => key.kind === 'move')) countdown = hold(countdown, Date.now(), ARROW_HOLD_MS)
   if (action === 'close') close()
   if (action === 'focus' && state.selectedId !== undefined) {
     focusing = true
@@ -76,5 +83,4 @@ process.stdin.on('data', keyReader(data => void press(data), ESCAPE_WAIT_MS))
 await refresh()
 setInterval(refresh, REFRESH_MS)
 setInterval(draw, FRAME_MS)
-setTimeout(close, settings.totalMs)
 draw()
