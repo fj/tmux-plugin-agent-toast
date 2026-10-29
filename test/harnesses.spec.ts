@@ -11,7 +11,7 @@ import { piHarness, piSummary } from '../src/harnesses/pi.ts'
 import type { AgentWindow } from '../src/windows.ts'
 
 const jsonl = (...entries: object[]) => entries.map(entry => JSON.stringify(entry)).join('\n')
-const window = (harness: string, session = 'x'): AgentWindow => ({ id: '@1', target: 's:1', name: 'win', state: 'done', harness, session, seen: 'done' })
+const window = (harness: string, session = 'x'): AgentWindow => ({ id: '@1', target: 's:1', name: 'win', state: 'done', harness, session, seen: 'done', title: '' })
 
 test('broken JSON lines are skipped', () => {
   assert.deepEqual(jsonLines('{"a":1}\nnot json\n\n3\n{"b":2}'), [{ a: 1 }, { b: 2 }])
@@ -84,4 +84,27 @@ test('without a summary the window name is used', async () => {
 test('an unknown harness keeps its name, and no harness reads as tmux', async () => {
   assert.deepEqual(await describe(window('opencode'), []), { label: 'opencode', summary: 'win' })
   assert.deepEqual(await describe(window(''), []), { label: 'tmux', summary: 'win' })
+})
+
+test('without a summary the pane title is used, minus its status glyphs', async () => {
+  const titled = (title: string) => ({ ...window(''), title })
+
+  assert.equal((await describe(titled('✳ Add Session Name'), [])).summary, 'Add Session Name')
+  assert.equal((await describe(titled('⠐ Fix it'), [])).summary, 'Fix it')
+  assert.equal((await describe(titled('π - Fix it - repo'), [])).summary, 'π - Fix it - repo')
+  assert.equal((await describe(titled('✳ '), [])).summary, 'win')
+})
+
+test('a harness summary wins over the pane title', async () => {
+  const echo: Harness = { name: 'echo', label: 'Echo', summarize: async () => 'from harness' }
+
+  assert.equal((await describe({ ...window('echo'), title: '✳ from title' }, [echo])).summary, 'from harness')
+})
+
+test('a pane title that is only the host name is skipped', async () => {
+  const titled = (title: string) => ({ ...window(''), title })
+
+  assert.equal((await describe(titled('box.example.com'), [], 'box.example.com')).summary, 'win')
+  assert.equal((await describe(titled('box'), [], 'box.example.com')).summary, 'win')
+  assert.equal((await describe(titled('✳ Fix it'), [], 'box.example.com')).summary, 'Fix it')
 })

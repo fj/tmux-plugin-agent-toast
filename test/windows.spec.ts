@@ -5,12 +5,12 @@ import { justSettled, markSeenArgs } from '../src/transitions.ts'
 import { FIELD_SEPARATOR, parseWindows, type AgentWindow } from '../src/windows.ts'
 
 const line = (...fields: string[]) => fields.join(FIELD_SEPARATOR)
-const agent = (id: string, state: string, seen: string): AgentWindow => ({ id, target: 's:1', name: 'w', state, harness: 'pi', session: '', seen })
+const agent = (id: string, state: string, seen: string): AgentWindow => ({ id, target: 's:1', name: 'w', state, harness: 'pi', session: '', seen, title: '' })
 
 test('only windows with agent options are listed, once each', () => {
   const text = [
     line('@1', 's:1', 'fish', '', '', '', ''),
-    line('@2', 's:2', 'pi', 'busy', 'pi', '/s.jsonl', 'busy'),
+    line('@2', 's:2', 'pi', 'busy', 'pi', '/s.jsonl', 'busy', '✳ Fix it'),
     line('@2', 't:1', 'pi', 'busy', 'pi', '/s.jsonl', 'busy'),
     line('@3', 's:3', 'old', '', '', '', 'done'),
   ].join('\n')
@@ -19,6 +19,7 @@ test('only windows with agent options are listed, once each', () => {
     parseWindows(text).map(({ id, target }) => `${id} ${target}`),
     ['@2 s:2', '@3 s:3'],
   )
+  assert.equal(parseWindows(text)[0]?.title, '✳ Fix it')
 })
 
 test('a window settles when it goes from busy to waiting or done', () => {

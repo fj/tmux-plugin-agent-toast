@@ -4,7 +4,7 @@ import { PULSE_MS, shade, waveAt } from './wave.ts'
 
 export type Mark = { glyph: string; rgb: Rgb | undefined }
 
-export type Row = { mark: Mark; target: string; label: string; summary: string; isNew: boolean }
+export type Row = { mark: Mark; target: string; label: string; summary: string; isNew: boolean; isSelected: boolean }
 
 export type FrameInput = {
   width: number
@@ -23,8 +23,11 @@ const WAITING_RGB: Rgb = [0xf0, 0xc6, 0x74]
 const DONE_RGB: Rgb = [0x9b, 0xe2, 0x7f]
 const MUTED_RGB: Rgb = [0x8a, 0x8a, 0x8a]
 const METER_RGB: Rgb = [0xf0, 0xc6, 0x74]
+const SELECTED_RGB: Rgb = [0x3a, 0x3f, 0x4b]
 const MS_PER_SECOND = 1000
 const PADDING = 1
+const MARK_CELLS = 2
+const COLUMN_GAP = ' '
 const BORDER_CELLS = 2
 const FOOTER_LINES = 2
 const TITLE_OFFSET = 2
@@ -36,9 +39,14 @@ const CURSOR = '▏'
 
 const RESET = '\x1b[0m'
 const BOLD = '\x1b[1m'
+type Style = { rgb?: Rgb | undefined; bg?: Rgb | undefined; bold?: boolean }
+
 const fg = ([r, g, b]: Rgb) => `\x1b[38;2;${r};${g};${b}m`
-const paint = (text: string, rgb: Rgb | undefined, bold = false) =>
-  rgb === undefined && !bold ? text : `${bold ? BOLD : ''}${rgb === undefined ? '' : fg(rgb)}${text}${RESET}`
+const bg = ([r, g, b]: Rgb) => `\x1b[48;2;${r};${g};${b}m`
+const paint = (text: string, { rgb, bg: back, bold = false }: Style) => {
+  const codes = `${bold ? BOLD : ''}${rgb === undefined ? '' : fg(rgb)}${back === undefined ? '' : bg(back)}`
+  return codes === '' ? text : `${codes}${text}${RESET}`
+}
 
 export const CHROME_LINES = BORDER_CELLS + FOOTER_LINES
 
@@ -72,25 +80,40 @@ function borderLine(y: number, input: FrameInput): string {
     return '─'
   }
 
-  return Array.from({ length: width }, (_, x) => paint(cellAt(x), rainbow(nowMs, perimeterIndex(x, y, width, height)), isTitle(x))).join('')
+  return Array.from({ length: width }, (_, x) => paint(cellAt(x), { rgb: rainbow(nowMs, perimeterIndex(x, y, width, height)), bold: isTitle(x) })).join('')
 }
 
 function side(x: number, y: number, input: FrameInput): string {
-  return paint('│', rainbow(input.nowMs, perimeterIndex(x, y, input.width, input.height)))
+  return paint('│', { rgb: rainbow(input.nowMs, perimeterIndex(x, y, input.width, input.height)) })
 }
 
-function rowColumns(rows: readonly Row[]): { target: number; label: number } {
+export type Columns = { target: number; label: number }
+
+export function rowColumns(rows: readonly Pick<Row, 'target' | 'label'>[]): Columns {
   return {
     target: Math.max(0, ...rows.map(row => textWidth(row.target))),
     label: Math.max(0, ...rows.map(row => textWidth(row.label))),
   }
 }
 
-function rowText(row: Row, columns: { target: number; label: number }, width: number): string {
-  const head = `${fit(row.target, columns.target)} ${fit(row.label, columns.label)} `
-  const summaryWidth = Math.max(0, width - 2 - textWidth(head))
+function headWidth(columns: Columns): number {
+  return columns.target + COLUMN_GAP.length + columns.label + COLUMN_GAP.length
+}
 
-  return `${paint(row.mark.glyph, row.mark.rgb, true)} ${paint(head, MUTED_RGB)}${paint(fit(row.summary, summaryWidth), undefined, row.isNew)}`
+function rowText(row: Row, columns: Columns, width: number): string {
+  const head = `${fit(row.target, columns.target)}${COLUMN_GAP}${fit(row.label, columns.label)}${COLUMN_GAP}`
+  const summaryWidth = Math.max(0, width - MARK_CELLS - headWidth(columns))
+  const back = row.isSelected ? SELECTED_RGB : undefined
+
+  return [
+    paint(row.mark.glyph, { rgb: row.mark.rgb, bg: back, bold: true }),
+    paint(` ${head}`, { rgb: MUTED_RGB, bg: back }),
+    paint(fit(row.summary, summaryWidth), { bg: back, bold: row.isNew }),
+  ].join('')
+}
+
+export function frameWidth(columns: Columns, summaryCells: number): number {
+  return BORDER_CELLS + 2 * PADDING + MARK_CELLS + headWidth(columns) + summaryCells
 }
 
 export function meterBar(fraction: number, cells: number): string {
@@ -115,7 +138,7 @@ function footer(input: FrameInput, width: number): string {
 
   return prompt === undefined
     ? fit(fallback, width)
-    : `${paint(meter, METER_RGB)}${' '.repeat(width - textWidth(meter) - textWidth(prompt))}${prompt}`
+    : `${paint(meter, { rgb: METER_RGB })}${' '.repeat(width - textWidth(meter) - textWidth(prompt))}${prompt}`
 }
 
 function footerCursorX(input: FrameInput, width: number): number {
@@ -124,14 +147,22 @@ function footerCursorX(input: FrameInput, width: number): number {
   return prompt === undefined ? Math.min(textWidth(fallback), width) - 1 : width - 1
 }
 
+function hiddenText(above: number, below: number): string {
+  if (above === 0) return `+${below} more`
+  return below === 0 ? `+${above} above` : `+${above} above, +${below} below`
+}
+
 function bodyLines(input: FrameInput, width: number): string[] {
   const capacity = Math.max(0, input.height - CHROME_LINES)
   const overflow = capacity > 0 && input.rows.length > capacity
-  const shown = overflow ? input.rows.slice(0, capacity - 1) : input.rows.slice(0, capacity)
+  const visible = overflow ? capacity - 1 : capacity
+  const selected = input.rows.findIndex(row => row.isSelected)
+  const start = Math.max(0, Math.min(selected - visible + 1, input.rows.length - visible))
+  const shown = input.rows.slice(start, start + visible)
   const columns = rowColumns(input.rows)
   const lines = shown.map(row => rowText(row, columns, width))
 
-  if (overflow) lines.push(paint(fit(`+${input.rows.length - shown.length} more`, width), MUTED_RGB))
+  if (overflow) lines.push(paint(fit(hiddenText(start, input.rows.length - start - shown.length), width), { rgb: MUTED_RGB }))
   while (lines.length < capacity) lines.push(' '.repeat(width))
 
   return [...lines, ' '.repeat(width), footer(input, width)]

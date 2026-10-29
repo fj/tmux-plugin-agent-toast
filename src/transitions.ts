@@ -1,8 +1,7 @@
-import { SEEN_OPTION, type AgentWindow } from './windows.ts'
+import { COMMAND_SEPARATOR, SEEN_OPTION, type AgentWindow } from './windows.ts'
 
 const BUSY = 'busy'
 const SETTLED_STATES = new Set(['waiting', 'done'])
-const COMMAND_SEPARATOR = ';'
 
 export function justSettled(windows: readonly AgentWindow[]): AgentWindow[] {
   return windows.filter(window => window.seen === BUSY && SETTLED_STATES.has(window.state))

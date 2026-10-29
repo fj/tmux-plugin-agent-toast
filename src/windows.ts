@@ -10,11 +10,13 @@ export type AgentWindow = {
   harness: string
   session: string
   seen: string
+  title: string
 }
 
 export type Tmux = (args: readonly string[]) => Promise<string>
 
 export const FIELD_SEPARATOR = '|:|'
+export const COMMAND_SEPARATOR = ';'
 const FIELDS: Record<keyof AgentWindow, string> = {
   id: '#{window_id}',
   target: '#{session_name}:#{window_index}',
@@ -23,6 +25,7 @@ const FIELDS: Record<keyof AgentWindow, string> = {
   harness: '#{@agent_harness}',
   session: '#{@agent_session}',
   seen: `#{${SEEN_OPTION}}`,
+  title: '#{pane_title}',
 }
 const KEYS = Object.keys(FIELDS) as (keyof AgentWindow)[]
 
@@ -52,4 +55,8 @@ export function parseWindows(text: string): AgentWindow[] {
 
 export async function listWindows(run: Tmux): Promise<AgentWindow[]> {
   return parseWindows(await run(['list-windows', '-a', '-F', WINDOW_FORMAT]))
+}
+
+export function focusArgs(client: string, windowId: string): string[] {
+  return ['select-window', '-t', windowId, COMMAND_SEPARATOR, 'switch-client', '-c', client, '-t', windowId]
 }

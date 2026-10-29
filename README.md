@@ -2,7 +2,7 @@
 
 A tmux plugin that shows a toast when a coding agent finishes work.
 
-When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds. If you press a key that is not part of `ok`, a red wave pulses across the popup from the cursor.
+When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds. Use the arrow keys to select an agent window, and press Enter to go to it. The timer stops while you use the arrow keys and resumes 3 seconds after the last one. If you press a key that is not part of `ok` and is not an arrow, a red wave pulses across the popup from the cursor.
 
 ## Install
 
@@ -54,7 +54,9 @@ A harness strategy in `src/harnesses/` reads the session that `@agent_session` n
 |---|---|---|
 | `claude` | The session id. | The custom title, the AI title, the summary, or the last prompt of the transcript. |
 | `pi` | The session file. | The session name, or the first prompt. |
-| Other | Not used. | The tmux window name. |
+| Other | Not used. | The pane title. |
+
+When a harness gives no summary, the toast uses the pane title without its leading status glyphs, then the window name.
 
 To add a harness, add a `Harness` to `HARNESSES` in `src/harnesses/index.ts`.
 

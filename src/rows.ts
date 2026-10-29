@@ -1,5 +1,5 @@
-import { markOf, type Row } from './frame.ts'
-import type { Description } from './harnesses/index.ts'
+import { markOf, rowColumns, type Columns, type Row } from './frame.ts'
+import { HARNESSES, labelOf, type Description, type Harness } from './harnesses/index.ts'
 import type { AgentWindow } from './windows.ts'
 
 export type Described = { window: AgentWindow; description: Description }
@@ -21,11 +21,20 @@ export function describeAll(windows: readonly AgentWindow[], newIds: ReadonlySet
   return Promise.all(newFirst.map(async window => ({ window, description: await describe(window) })))
 }
 
-export function rowsAt(described: readonly Described[], newIds: ReadonlySet<string>, nowMs: number): Row[] {
+function targetOf(window: AgentWindow): string {
+  return `${window.target} ${window.id}`
+}
+
+export function windowColumns(windows: readonly AgentWindow[], harnesses: readonly Harness[] = HARNESSES): Columns {
+  return rowColumns(windows.map(window => ({ target: targetOf(window), label: labelOf(window, harnesses) })))
+}
+
+export function rowsAt(described: readonly Described[], newIds: ReadonlySet<string>, selectedId: string | undefined, nowMs: number): Row[] {
   return described.map(({ window, description }) => ({
     mark: markOf(window.state, nowMs),
-    target: `${window.target} ${window.id}`,
+    target: targetOf(window),
     ...description,
     isNew: newIds.has(window.id),
+    isSelected: window.id === selectedId,
   }))
 }
