@@ -29,12 +29,24 @@ function paneTitle(title: string, host: string): string | undefined {
   return isHost || text.trim() === '' ? undefined : text
 }
 
+function harnessOf(window: AgentWindow, harnesses: readonly Harness[]): Harness | undefined {
+  return harnesses.find(({ name }) => name === window.harness)
+}
+
+function labelFor(window: AgentWindow, harness: Harness | undefined): string {
+  return harness?.label ?? (window.harness || FALLBACK_LABEL)
+}
+
+export function labelOf(window: AgentWindow, harnesses: readonly Harness[] = HARNESSES): string {
+  return labelFor(window, harnessOf(window, harnesses))
+}
+
 export async function describe(window: AgentWindow, harnesses: readonly Harness[] = HARNESSES, host = hostname()): Promise<Description> {
-  const harness = harnesses.find(({ name }) => name === window.harness)
+  const harness = harnessOf(window, harnesses)
   const summary = harness === undefined ? undefined : await harness.summarize(window.session).catch(() => undefined)
 
   return {
-    label: harness?.label ?? (window.harness || FALLBACK_LABEL),
+    label: labelFor(window, harness),
     summary: oneLine(summary ?? paneTitle(window.title, host) ?? window.name),
   }
 }

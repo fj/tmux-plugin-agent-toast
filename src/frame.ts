@@ -25,6 +25,8 @@ const MUTED_RGB: Rgb = [0x8a, 0x8a, 0x8a]
 const METER_RGB: Rgb = [0xf0, 0xc6, 0x74]
 const MS_PER_SECOND = 1000
 const PADDING = 1
+const MARK_CELLS = 2
+const COLUMN_GAP = ' '
 const BORDER_CELLS = 2
 const FOOTER_LINES = 2
 const TITLE_OFFSET = 2
@@ -79,18 +81,28 @@ function side(x: number, y: number, input: FrameInput): string {
   return paint('│', rainbow(input.nowMs, perimeterIndex(x, y, input.width, input.height)))
 }
 
-function rowColumns(rows: readonly Row[]): { target: number; label: number } {
+export type Columns = { target: number; label: number }
+
+export function rowColumns(rows: readonly Pick<Row, 'target' | 'label'>[]): Columns {
   return {
     target: Math.max(0, ...rows.map(row => textWidth(row.target))),
     label: Math.max(0, ...rows.map(row => textWidth(row.label))),
   }
 }
 
-function rowText(row: Row, columns: { target: number; label: number }, width: number): string {
-  const head = `${fit(row.target, columns.target)} ${fit(row.label, columns.label)} `
-  const summaryWidth = Math.max(0, width - 2 - textWidth(head))
+function headWidth(columns: Columns): number {
+  return columns.target + COLUMN_GAP.length + columns.label + COLUMN_GAP.length
+}
+
+function rowText(row: Row, columns: Columns, width: number): string {
+  const head = `${fit(row.target, columns.target)}${COLUMN_GAP}${fit(row.label, columns.label)}${COLUMN_GAP}`
+  const summaryWidth = Math.max(0, width - MARK_CELLS - headWidth(columns))
 
   return `${paint(row.mark.glyph, row.mark.rgb, true)} ${paint(head, MUTED_RGB)}${paint(fit(row.summary, summaryWidth), undefined, row.isNew)}`
+}
+
+export function frameWidth(columns: Columns, summaryCells: number): number {
+  return BORDER_CELLS + 2 * PADDING + MARK_CELLS + headWidth(columns) + summaryCells
 }
 
 export function meterBar(fraction: number, cells: number): string {
