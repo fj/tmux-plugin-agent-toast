@@ -41,8 +41,12 @@ export function popupArgv(client: Client, windows: readonly AgentWindow[], newId
   return [
     'flock', '-n', lock,
     'tmux', 'display-popup', '-c', client.name, '-B', '-x', 'R', '-y', '0', '-w', `${width}`, '-h', `${height}`, '-E',
-    process.execPath, POPUP, ...newIds,
+    process.execPath, POPUP, client.name, ...newIds,
   ]
+}
+
+export function parsePopupArgs([client = '', ...newIds]: readonly string[]): { client: string; newIds: string[] } {
+  return { client, newIds }
 }
 
 export type Spawn = (argv: readonly string[]) => void

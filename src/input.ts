@@ -6,9 +6,11 @@ export type Key =
   | { kind: 'text'; char: string }
   | { kind: 'erase' }
   | { kind: 'move'; step: number }
+  | { kind: 'enter' }
   | { kind: 'other' }
 
 const ERASE_KEYS = new Set(['\x7f', '\b'])
+const ENTER_KEYS = new Set(['\r', '\n'])
 const ARROW_STEPS = new Map([
   ['\x1b[A', -1],
   ['\x1b[D', -1],
@@ -27,6 +29,7 @@ function keyOf(sequence: string): Key {
   const step = ARROW_STEPS.get(sequence)
 
   if (step !== undefined) return { kind: 'move', step }
+  if (ENTER_KEYS.has(sequence)) return { kind: 'enter' }
   if (ERASE_KEYS.has(sequence)) return { kind: 'erase' }
   if (PRINTABLE.test(sequence)) return { kind: 'text', char: sequence }
   return { kind: 'other' }
@@ -73,7 +76,7 @@ export function isMistyped(keys: readonly Key[], typed: string): boolean {
 }
 
 export type KeyState = { typed: string; selectedId: string | undefined }
-export type KeyAction = 'close' | 'pulse' | undefined
+export type KeyAction = 'close' | 'focus' | 'pulse' | undefined
 
 export function pressKeys(state: KeyState, keys: readonly Key[], ids: readonly string[]): { state: KeyState; action: KeyAction } {
   const typed = typedAfter(state.typed, keys)
@@ -82,6 +85,7 @@ export function pressKeys(state: KeyState, keys: readonly Key[], ids: readonly s
   const next = { typed, selectedId }
 
   if (isAcknowledged(typed)) return { state: next, action: 'close' }
+  if (selectedId !== undefined && keys.some(key => key.kind === 'enter')) return { state: next, action: 'focus' }
   return { state: next, action: isMistyped(keys, typed) ? 'pulse' : undefined }
 }
 

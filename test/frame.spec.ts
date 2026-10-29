@@ -177,17 +177,18 @@ test('a mistype pulses the popup from the prompt cursor', () => {
 })
 
 test('escape sequences are one key, so arrows never type', () => {
-  assert.deepEqual(parseKeys('\x1b[Ao\x1bOB\x1b'), [
+  assert.deepEqual(parseKeys('\x1b[Ao\x1bOB\r\x1b'), [
     { kind: 'move', step: -1 },
     { kind: 'text', char: 'o' },
     { kind: 'move', step: 1 },
+    { kind: 'enter' },
     { kind: 'other' },
   ])
   assert.equal(typing('o', '\x1b[A\x1b[Bk'), 'ok')
 })
 
-test('arrows are not mistypes', () => {
-  for (const data of ['\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D', '\x1bOA']) {
+test('arrows and enter are not mistypes', () => {
+  for (const data of ['\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D', '\x1bOA', '\r']) {
     assert.equal(isMistyped(parseKeys(data), typing('', data)), false, JSON.stringify(data))
   }
   assert.equal(isMistyped(parseKeys('\x1b[Ax'), typing('', '\x1b[Ax')), true)

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { after, test } from 'node:test'
 
 import { markOf, renderFrame } from '../src/frame.ts'
-import { launchPopups, lockPath, parseClients, popupArgv, POPUP } from '../src/launch.ts'
+import { launchPopups, lockPath, parseClients, parsePopupArgs, popupArgv, POPUP } from '../src/launch.ts'
 import { FIELD_SEPARATOR, type AgentWindow } from '../src/windows.ts'
 
 const CONF = join(import.meta.dirname, '..', 'agent-toast.conf')
@@ -38,7 +38,7 @@ test('the popup is borderless, pinned top-right, and sized to its rows', () => {
 
   assert.deepEqual(argv.slice(0, 3), ['flock', '-n', '/run/x.lock'])
   assert.deepEqual(argv.slice(3, argv.indexOf('-E')), ['tmux', 'display-popup', '-c', '/dev/pts/2', '-B', '-x', 'R', '-y', '0', '-w', '72', '-h', '7'])
-  assert.deepEqual(argv.slice(argv.indexOf('-E') + 1), [process.execPath, POPUP, '@4'])
+  assert.deepEqual(argv.slice(argv.indexOf('-E') + 1), [process.execPath, POPUP, '/dev/pts/2', '@4'])
 })
 
 test('long targets widen the popup so summaries keep at least 50 cells', () => {
@@ -96,4 +96,10 @@ test('the conf hook records each state the agent sets', { skip: !hasTmux && 'tmu
 
   assert.ok(await seenBecomes('busy'))
   assert.ok(await seenBecomes('done'))
+})
+
+test('the popup reads back the client and new ids it was launched with', () => {
+  const argv = popupArgv({ name: '/dev/pts/2', width: 200, height: 50 }, agents(2), ['@4', '@5'], '/run/x.lock')
+
+  assert.deepEqual(parsePopupArgs(argv.slice(argv.indexOf(POPUP) + 1)), { client: '/dev/pts/2', newIds: ['@4', '@5'] })
 })

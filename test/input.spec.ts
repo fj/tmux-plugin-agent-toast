@@ -12,6 +12,10 @@ test('every arrow moves the selection one way', () => {
   for (const data of ['\x1b[B', '\x1b[C', '\x1bOB', '\x1bOC']) assert.deepEqual(parseKeys(data), [{ kind: 'move', step: 1 }], JSON.stringify(data))
 })
 
+test('carriage return and line feed are both enter', () => {
+  assert.deepEqual(parseKeys('\r\n'), [{ kind: 'enter' }, { kind: 'enter' }])
+})
+
 test('a sequence with parameters and an astral character are one key each', () => {
   assert.deepEqual(parseKeys('\x1b[1;5A'), [{ kind: 'other' }])
   assert.deepEqual(parseKeys('😀'), [{ kind: 'text', char: '😀' }])
@@ -19,6 +23,15 @@ test('a sequence with parameters and an astral character are one key each', () =
 
 test('arrows select rows without a pulse', () => {
   assert.deepEqual(press('\x1b[B\x1b[B'), { state: { typed: '', selectedId: '@2' }, action: undefined })
+})
+
+test('enter focuses the selected row, after moves in the same batch', () => {
+  assert.deepEqual(press('\x1b[B\r'), { state: { typed: '', selectedId: '@1' }, action: 'focus' })
+  assert.deepEqual(press('\x1b[B\r', { typed: '', selectedId: '@1' }), { state: { typed: '', selectedId: '@2' }, action: 'focus' })
+})
+
+test('enter with no selection does nothing', () => {
+  assert.deepEqual(press('\r'), { state: start, action: undefined })
 })
 
 test('typing ok closes, even with a selection', () => {
@@ -66,4 +79,8 @@ test('the key reader joins a split arrow and flushes a lone Esc after the wait',
   } finally {
     mock.timers.reset()
   }
+})
+
+test('enter on a selection whose window closed does nothing', () => {
+  assert.deepEqual(press('\r', { typed: '', selectedId: '@9' }), { state: start, action: undefined })
 })
