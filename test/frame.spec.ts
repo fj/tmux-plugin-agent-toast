@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { fit, textWidth } from '../src/cells.ts'
 import { markOf, meterBar, perimeterIndex, renderFrame, type FrameInput } from '../src/frame.ts'
-import { isAcknowledged, isMistyped, typedAfter } from '../src/input.ts'
+import { isAcknowledged, isMistyped, parseKeys, typedAfter } from '../src/input.ts'
 import { rainbow } from '../src/rainbow.ts'
 import { PULSE_MS, shade, waveAt } from '../src/wave.ts'
 
@@ -19,7 +19,8 @@ const backgrounds = (line: string) => {
   }
   return cells
 }
-const row = (summary: string, isNew = false) => ({ mark: markOf('done', 0), target: 's:1 @1', label: 'Pi', summary, isNew })
+const row = (summary: string, isNew = false, isSelected = false) => ({ mark: markOf('done', 0), target: 's:1 @1', label: 'Pi', summary, isNew, isSelected })
+const typing = (typed: string, data: string) => typedAfter(typed, parseKeys(data))
 const frame = (overrides: Partial<FrameInput> = {}): FrameInput => ({
   width: 40,
   height: 7,
@@ -120,17 +121,17 @@ test('marks match the tmux badge', () => {
 })
 
 test('only typing ok acknowledges, in any case', () => {
-  assert.equal(isAcknowledged(typedAfter('', 'o')), false)
-  assert.equal(isAcknowledged(typedAfter('', 'ok')), true)
-  assert.equal(isAcknowledged(typedAfter('', 'OK')), true)
-  assert.equal(isAcknowledged(typedAfter('', 'xok')), true)
-  assert.equal(isAcknowledged(typedAfter('', 'o\rk')), true)
-  assert.equal(isAcknowledged(typedAfter('', 'ox\x7fk')), true)
-  assert.equal(isAcknowledged(typedAfter('', '\x03\x1b\r')), false)
+  assert.equal(isAcknowledged(typing('', 'o')), false)
+  assert.equal(isAcknowledged(typing('', 'ok')), true)
+  assert.equal(isAcknowledged(typing('', 'OK')), true)
+  assert.equal(isAcknowledged(typing('', 'xok')), true)
+  assert.equal(isAcknowledged(typing('', 'o\rk')), true)
+  assert.equal(isAcknowledged(typing('', 'ox\x7fk')), true)
+  assert.equal(isAcknowledged(typing('', '\x03\x1b\r')), false)
 })
 
 test('only a key that strays from ok is a mistype', () => {
-  const press = (typed: string, keys: string) => isMistyped(keys, typedAfter(typed, keys))
+  const press = (typed: string, data: string) => isMistyped(parseKeys(data), typing(typed, data))
 
   assert.equal(press('', 'o'), false)
   assert.equal(press('', 'O'), false)
@@ -139,8 +140,8 @@ test('only a key that strays from ok is a mistype', () => {
   assert.equal(press('', 'x'), true)
   assert.equal(press('', 'k'), true)
   assert.equal(press('o', 'x'), true)
-  assert.equal(press('o', '\r'), true)
-  assert.equal(press('', '\x1b[A'), true)
+  assert.equal(press('', '\x1b'), true)
+  assert.equal(press('', '\x03'), true)
 })
 
 test('the wave rings out from its origin and fades', () => {
@@ -173,4 +174,62 @@ test('a mistype pulses the popup from the prompt cursor', () => {
   assert.notEqual(footer[cursorX], undefined)
   assert.equal(backgrounds(pulsed[0] ?? '')[0], undefined)
   assert.ok(renderFrame(frame({ pulseAgeMs: PULSE_MS })).every(line => !line.includes('48;2;')))
+})
+
+test('escape sequences are one key, so arrows never type', () => {
+  assert.deepEqual(parseKeys('\x1b[Ao\x1bOB\x1b'), [
+    { kind: 'move', step: -1 },
+    { kind: 'text', char: 'o' },
+    { kind: 'move', step: 1 },
+    { kind: 'other' },
+  ])
+  assert.equal(typing('o', '\x1b[A\x1b[Bk'), 'ok')
+})
+
+test('arrows are not mistypes', () => {
+  for (const data of ['\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D', '\x1bOA']) {
+    assert.equal(isMistyped(parseKeys(data), typing('', data)), false, JSON.stringify(data))
+  }
+  assert.equal(isMistyped(parseKeys('\x1b[Ax'), typing('', '\x1b[Ax')), true)
+})
+
+test('the selected row has a background across its full width', () => {
+  const [, selected, other] = renderFrame(frame({ rows: [row('first', false, true), row('second')] }))
+  const cells = backgrounds(selected ?? '')
+
+  assert.ok(cells.slice(2, -2).every(cell => cell !== undefined))
+  assert.equal(cells[0], undefined)
+  assert.ok(backgrounds(other ?? '').every(cell => cell === undefined))
+})
+
+test('rows scroll to keep the selected row in view', () => {
+  const rows = ['a', 'b', 'c', 'd', 'e'].map(summary => row(summary, false, summary === 'd'))
+  const lines = renderFrame(frame({ rows })).map(plain)
+
+  assert.match(lines[1] ?? '', / c +│$/)
+  assert.match(lines[2] ?? '', / d +│$/)
+  assert.match(lines[3] ?? '', /^│ \+2 above, \+1 below +│$/)
+
+  const last = renderFrame(frame({ rows: rows.map((r, i) => ({ ...r, isSelected: i === 4 })) })).map(plain)
+  assert.match(last[3] ?? '', /^│ \+3 above +│$/)
+})
+
+test('shading keeps the line background outside the wave', () => {
+  const line = `a\x1b[48;2;9;9;9mbc\x1b[0md`
+  const shaded = shade(line, x => (x === 1 ? [1, 2, 3] : undefined))
+
+  assert.deepEqual(backgrounds(shaded), [undefined, '1;2;3', '9;9;9', undefined])
+})
+
+test('a pulse keeps the selected row highlighted', () => {
+  const [, selected] = renderFrame(frame({ rows: [row('first', false, true)], pulseAgeMs: PULSE_MS / 2 }))
+
+  assert.ok(backgrounds(selected ?? '').slice(2, -2).every(cell => cell !== undefined))
+})
+
+test('every reset code ends the line background', () => {
+  for (const reset of ['\x1b[0m', '\x1b[m', '\x1b[49m']) {
+    const shaded = shade(`\x1b[48;2;9;9;9ma${reset}b`, () => undefined)
+    assert.deepEqual(backgrounds(shaded), ['9;9;9', undefined], JSON.stringify(reset))
+  }
 })

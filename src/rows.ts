@@ -29,11 +29,12 @@ export function windowColumns(windows: readonly AgentWindow[], harnesses: readon
   return rowColumns(windows.map(window => ({ target: targetOf(window), label: labelOf(window, harnesses) })))
 }
 
-export function rowsAt(described: readonly Described[], newIds: ReadonlySet<string>, nowMs: number): Row[] {
+export function rowsAt(described: readonly Described[], newIds: ReadonlySet<string>, selectedId: string | undefined, nowMs: number): Row[] {
   return described.map(({ window, description }) => ({
     mark: markOf(window.state, nowMs),
     target: targetOf(window),
     ...description,
     isNew: newIds.has(window.id),
+    isSelected: window.id === selectedId,
   }))
 }

@@ -20,7 +20,7 @@ test('rows carry the mark, target, description and whether the window is new', a
   const described = await describeAll([window('@1', 'waiting'), window('@2', 'busy')], new Set(['@1']), byName)
 
   assert.deepEqual(
-    rowsAt(described, new Set(['@1']), 0).map(({ mark, target, summary, isNew }) => [mark.glyph, target, summary, isNew]),
+    rowsAt(described, new Set(['@1']), undefined, 0).map(({ mark, target, summary, isNew }) => [mark.glyph, target, summary, isNew]),
     [['?', 's:1 @1', 'w@1', true], ['◐', 's:2 @2', 'w@2', false]],
   )
 })
@@ -61,6 +61,12 @@ test('no settled window means no toast', async () => {
   await notifySettled(async args => (args[0] === 'list-windows' ? listing([window('@1', 'busy', 'done')]) : ''), async () => void launches.push(1))
 
   assert.deepEqual(launches, [])
+})
+
+test('only the row of the selected window is selected', async () => {
+  const described = await describeAll([window('@1'), window('@2')], new Set(), byName)
+
+  assert.deepEqual(rowsAt(described, new Set(), '@2', 0).map(({ isSelected }) => isSelected), [false, true])
 })
 
 test('columns fit the widest target and harness label', () => {

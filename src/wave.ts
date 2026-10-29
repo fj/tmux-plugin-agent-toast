@@ -12,6 +12,8 @@ const PULSE_RGB: Rgb = [0xe0, 0x6c, 0x75]
 const MS_PER_SECOND = 1000
 const SGR = /\x1b\[[0-9;]*m/y
 const DEFAULT_BACKGROUND = '\x1b[49m'
+const SET_BACKGROUND = /^\x1b\[48;/
+const CLEAR_BACKGROUND = new Set(['\x1b[0m', '\x1b[m', DEFAULT_BACKGROUND])
 
 const bg = ([r, g, b]: Rgb) => `\x1b[48;2;${r};${g};${b}m`
 
@@ -29,12 +31,15 @@ export function shade(line: string, backgroundAt: (x: number) => Rgb | undefined
   let out = ''
   let x = 0
   let current: string | undefined
+  let own = DEFAULT_BACKGROUND
 
   for (let i = 0; i < line.length; ) {
     SGR.lastIndex = i
     const escape = SGR.exec(line)
     if (escape !== null) {
       out += escape[0]
+      if (SET_BACKGROUND.test(escape[0])) own = escape[0]
+      else if (CLEAR_BACKGROUND.has(escape[0])) own = DEFAULT_BACKGROUND
       current = undefined
       i += escape[0].length
       continue
@@ -42,7 +47,7 @@ export function shade(line: string, backgroundAt: (x: number) => Rgb | undefined
 
     const char = String.fromCodePoint(line.codePointAt(i) ?? 0)
     const rgb = backgroundAt(x)
-    const wanted = rgb === undefined ? DEFAULT_BACKGROUND : bg(rgb)
+    const wanted = rgb === undefined ? own : bg(rgb)
     if (wanted !== current) out += wanted
     current = wanted
     out += char

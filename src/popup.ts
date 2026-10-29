@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { renderFrame } from './frame.ts'
 import { describe } from './harnesses/index.ts'
-import { isAcknowledged, isMistyped, typedAfter } from './input.ts'
+import { keyReader, parseKeys, pressKeys, type KeyState } from './input.ts'
 import { cachedDescribe, describeAll, rowsAt, type Described } from './rows.ts'
 import { readSettings } from './settings.ts'
 import { listWindows, tmux } from './windows.ts'
 
 const FRAME_MS = 40
 const REFRESH_MS = 1000
+const ESCAPE_WAIT_MS = 50
 const TITLE = 'agents'
 const HIDE_CURSOR = '\x1b[?25l'
 const SHOW_CURSOR = '\x1b[?25h'
@@ -18,7 +19,7 @@ const describeWindow = cachedDescribe(describe)
 const startMs = Date.now()
 const settings = await readSettings(tmux)
 let described: Described[] = []
-let typed = ''
+let keyState: KeyState = { typed: '', selectedId: undefined }
 let mistypedAtMs: number | undefined
 
 async function refresh(): Promise<void> {
@@ -33,10 +34,10 @@ function draw(): void {
     height: process.stdout.rows,
     nowMs,
     title: TITLE,
-    rows: rowsAt(described, newIds, nowMs),
+    rows: rowsAt(described, newIds, keyState.selectedId, nowMs),
     remainingMs: Math.max(0, settings.totalMs - (nowMs - startMs)),
     totalMs: settings.totalMs,
-    typed,
+    typed: keyState.typed,
     pulseAgeMs: mistypedAtMs === undefined ? undefined : nowMs - mistypedAtMs,
   })
 
@@ -48,17 +49,19 @@ function close(): never {
   process.exit(0)
 }
 
+async function press(data: string): Promise<void> {
+  const { state, action } = pressKeys(keyState, parseKeys(data), described.map(({ window }) => window.id))
+
+  keyState = state
+  if (action === 'close') close()
+  if (action === 'pulse' && settings.wave) mistypedAtMs = Date.now()
+  draw()
+}
+
 process.stdout.write(HIDE_CURSOR)
 process.stdin.setRawMode(true)
 process.stdin.setEncoding('utf8')
-process.stdin.on('data', (keys: string) => {
-  typed = typedAfter(typed, keys)
-  if (isAcknowledged(typed)) close()
-  if (settings.wave && isMistyped(keys, typed)) {
-    mistypedAtMs = Date.now()
-    draw()
-  }
-})
+process.stdin.on('data', keyReader(data => void press(data), ESCAPE_WAIT_MS))
 
 await refresh()
 setInterval(refresh, REFRESH_MS)

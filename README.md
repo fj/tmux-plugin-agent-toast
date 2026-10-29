@@ -2,7 +2,7 @@
 
 A tmux plugin that shows a toast when a coding agent finishes work.
 
-When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds. If you press a key that is not part of `ok`, a red wave pulses across the popup from the cursor.
+When an agent window goes from busy to waiting or done, a popup opens in the top-right corner of each attached client. It has an animated rainbow border and lists every agent window with its state, harness and a summary. Type `ok` to close it, or wait 10 seconds. Use the arrow keys to select an agent window. If you press a key that is not part of `ok` and is not an arrow, a red wave pulses across the popup from the cursor.
 
 ## Install
 
